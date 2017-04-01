@@ -1,0 +1,41 @@
+{
+    "id": "org.ekstep.plugins.wordworm",
+    "ver": "1.0",
+    "author": "Deepak Narayana Rao",
+    "type": "widget",
+    "title": "org.ekstep.plugins.wordworm Plugin",
+    "description": "",
+    "publishedDate": "",
+    "editor": {
+        "main": "editor/plugin.js",
+        "dependencies": [],
+        "menu": [],
+        "help": {
+            "src": "editor/help.md",
+            "dataType": "text"
+        },
+        "init-data": {
+            "type": "roundrect",
+            "x": 11,
+            "y": 0.1,
+            "w": 78,
+            "h": 99,
+            "radius": 10,
+            "stroke": "rgba(255, 255, 255, 255)",
+            "strokeWidth": 1
+        },
+        "configManifest": [{
+            "propertyName": "wordText",
+            "title": "Enter the word you want to teach (Max 10 alphabets)",
+            "placeholder": "Example: Apple",
+            "description": "Word",
+            "dataType": "input",
+            "valueType": "text",
+            "required": true,
+            "defaultValue": "Apple"
+        }]
+    },
+    "renderer": {
+        "main": "renderer/plugin.js"
+    }
+}

@@ -51,6 +51,8 @@ WordWormPlugin.Game = function(word) {
     self.word = (word || "").toUpperCase();
     self.grid = new WordWormPlugin.Grid(18, 26); // Ratio 9:13
     self.worm = new WordWormPlugin.Worm(new WordWormPlugin.Position(0, 0), WordWormPlugin.Direction.RIGHT);
+    self.isWon = false;
+    self.stopReason = "";
 
     self.start = function() {
         console.log("Starting the WordWorm game for word :", self.word);
@@ -59,7 +61,9 @@ WordWormPlugin.Game = function(word) {
         return self;
     };
 
-    self.stop = function(reason) {
+    self.stop = function(isWon, reason) {
+        self.isWon = isWon;
+        self.stopReason = reason;
         console.log("Stopping the WordWorm game for word :", self.word, reason);
         document.removeEventListener('keydown', self._onKeyDownHandler, false);
         self.dispatchEvent("game:stopped");
@@ -89,13 +93,13 @@ WordWormPlugin.Game = function(word) {
         var nextPositionOfWorm = self.worm.getNextPosition();
 
         if (wordForemedByWorm === self.word) {
-            self.stop("Worm has formed the word successfully");
+            self.stop(true, "Worm has formed the word successfully");
         } else if (wordForemedByWorm && self.word.indexOf(wordForemedByWorm) !== 0) {
-            self.stop("Worm has alphabet is wrong order");
+            self.stop(false, "Worm has alphabet is wrong order");
         } else if (self.grid.isOutside(nextPositionOfWorm)) {
-            self.stop("Worm is going outside the grid");
+            self.stop(false, "Worm is going outside the grid");
         } else if (self.worm.hasNodeAtPosition(nextPositionOfWorm)) {
-            self.stop("Worm is collides with the body");
+            self.stop(false, "Worm is collides with the body");
         } else {
             self.worm.move();
         }
@@ -195,7 +199,7 @@ WordWormPlugin.Worm = Class.extend({
     },
 
     getWord: function() {
-        var alphabets =_.map(this.getDataNodes(), function(node) {
+        var alphabets = _.map(this.getDataNodes(), function(node) {
             return node.data;
         });
         var word = alphabets.join('');
@@ -384,8 +388,8 @@ Plugin.extend({
         var dims = this.relativeDims();
         console.log("dims -> ", dims);
 
-        this.game = new WordWormPlugin.Game(data.wordText).start();
-        this.gameRenderer = new WordWormPlugin.GameRenderer(dims);
+        self.game = new WordWormPlugin.Game(data.wordText).start();
+        self.gameRenderer = new WordWormPlugin.GameRenderer(dims);
 
         var tickEventListener = function() {
             self.game.onEachTick();
@@ -396,9 +400,22 @@ Plugin.extend({
         createjs.Ticker.setFPS(1);
         createjs.Ticker.addEventListener("tick", tickEventListener);
 
+        // TelemetryService.isActive = true;
+        // var assessEvent = TelemetryService.assess("org.ekstep.wordworm.01", "LIT", "EASY", { stageId: self._stage._currentState.stage.id, subtype: " " });
+
         self.game.addEventListener("game:stopped", function() {
             console.log("Removing tickEventListener");
             createjs.Ticker.removeEventListener("tick", tickEventListener);
+
+            // var assessEndEventData = {
+            //     pass: self.game.isWon,
+            //     score: self.game.isWon ? 1 : 0,
+            //     res: self.game.stopReason,
+            //     qindex: 1,
+            //     qtitle: "WordWorm game for word : " + self.game.word,
+            //     qdesc: ""
+            // };
+            // TelemetryService.assessEnd(assessEvent, assessEndEventData);
         });
 
         this._self = this.gameRenderer.getMainRenderingObject();

@@ -41,7 +41,7 @@ WordWormPlugin.Game = function(word) {
     createjs.EventDispatcher.initialize(self);
     self.word = word || "";
     self.grid = new WordWormPlugin.Grid(18, 26); // Ratio 9:13
-    self.worm = new WordWormPlugin.Worm();
+    self.worm = new WordWormPlugin.Worm(new WordWormPlugin.Position(3, 0), WordWormPlugin.Direction.RIGHT);
     self.isInProgress = false;
 
     self.start = function() {
@@ -108,8 +108,8 @@ WordWormPlugin.Grid = Class.extend({
     _randomPositionForFoodItem: function() {
         var minX = 1;
         var minY = 1;
-        var randomX = _.random(minX, this.numberOfCulumns);
-        var randomY = _.random(minY, this.numberOfRows);
+        var randomX = _.random(minX, this.numberOfCulumns - 1);
+        var randomY = _.random(minY, this.numberOfRows - 1);
         var randomPosition = new WordWormPlugin.Position(randomX, randomY);
         var randomPositionIsOccupied = _.any(this.foodItems, function(foodItem) {
             return foodItem.position.equals(randomPosition);
@@ -151,8 +151,9 @@ WordWormPlugin.WormNode = Class.extend({
 
 
 WordWormPlugin.Worm = Class.extend({
-    init: function(nodes) {
-        this.nodes = nodes || this._defaultNodes();
+    init: function(position, direction) {
+        this.direction = direction || WordWormPlugin.Direction.NONE;
+        this.nodes = this._defaultNodes(position);
     },
 
     getHeadNode: function() {
@@ -165,32 +166,26 @@ WordWormPlugin.Worm = Class.extend({
 
     getNextPosition: function() {
         var currentPosition = this.getCurrentPosition()
-        var currentDirection = this.getCurrentDirection();
-        return currentDirection.applyOffset(currentPosition);
+        return this.direction.applyOffset(currentPosition);
     },
 
     getCurrentPosition: function() {
         return this.getHeadNode().position;
     },
 
-    getCurrentDirection: function() {
-        return this.getHeadNode().direction;
-    },
-
     canChangeToDirection: function(newDirection) {
-        var currentDirection = this.getCurrentDirection()
-        return newDirection !== currentDirection && !newDirection.isOppositeOf(currentDirection);
+        return newDirection !== this.direction && !newDirection.isOppositeOf(this.direction);
     },
 
     changeDirection: function(direction) {
         if (!this.canChangeToDirection(direction)) {
             return;
         }
-        this.move(direction);
+        this.direction = direction;
     },
 
-    move: function(direction) {
-        var directionForNextNode = direction || this.getCurrentDirection();
+    move: function() {
+        var directionForNextNode = this.direction;
         _.each(this.nodes, function(node) {
             var currentNodePrviousDirection = node.direction;
             node.changeDirection(directionForNextNode);
@@ -199,13 +194,13 @@ WordWormPlugin.Worm = Class.extend({
         });
     },
 
-    _defaultNodes: function() {
-        // var headNode = new WordWormPlugin.WormNode(true, WordWormPlugin.Direction.NONE, new WordWormPlugin.Position(0, 0));
+    _defaultNodes: function(position, direction) {
+        // var headNode = new WordWormPlugin.WormNode(true, this.direction, position || new WordWormPlugin.Position(0, 0));
         // return [headNode];
-        var headNode = new WordWormPlugin.WormNode(true, WordWormPlugin.Direction.RIGHT, new WordWormPlugin.Position(3, 0));
-        var n1 = new WordWormPlugin.WormNode(true, WordWormPlugin.Direction.RIGHT, new WordWormPlugin.Position(2, 0), "D");
-        var n2 = new WordWormPlugin.WormNode(true, WordWormPlugin.Direction.RIGHT, new WordWormPlugin.Position(1, 0), "O");
-        var n3 = new WordWormPlugin.WormNode(true, WordWormPlugin.Direction.RIGHT, new WordWormPlugin.Position(0, 0), "G");
+        var headNode = new WordWormPlugin.WormNode(true, this.direction, position || new WordWormPlugin.Position(3, 0));
+        var n1 = new WordWormPlugin.WormNode(true, this.direction, new WordWormPlugin.Position(2, 0), "D");
+        var n2 = new WordWormPlugin.WormNode(true, this.direction, new WordWormPlugin.Position(1, 0), "O");
+        var n3 = new WordWormPlugin.WormNode(true, this.direction, new WordWormPlugin.Position(0, 0), "G");
         return [headNode, n1, n2, n3];
     }
 });
@@ -260,8 +255,8 @@ WordWormPlugin.GridRenderer = Class.extend({
         _.each(grid.foodItems, function(foodItem) {
             self.foodItemToRenderedObjectMap[foodItem.id] = self.foodItemToRenderedObjectMap[foodItem.id] || self._createRenderingObjectForFoodItem(foodItem, cellDims);
             var renderedObject = self.foodItemToRenderedObjectMap[foodItem.id];
-            renderedObject.x = (foodItem.position.x - 1) * cellDims.w;
-            renderedObject.y = (foodItem.position.y - 1) * cellDims.h;
+            renderedObject.x = foodItem.position.x * cellDims.w;
+            renderedObject.y = foodItem.position.y * cellDims.h;
         });
     },
 

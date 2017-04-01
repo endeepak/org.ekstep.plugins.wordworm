@@ -64,7 +64,7 @@ WordWormPlugin.Game = function(word) {
     self.stop = function(isWon, reason) {
         self.isWon = isWon;
         self.stopReason = reason;
-        console.log("Stopping the WordWorm game for word :", self.word, reason);
+        console.log("Stopping the WordWorm game for word :", self.word, ", Reason :", reason);
         document.removeEventListener('keydown', self._onKeyDownHandler, false);
         self.dispatchEvent("game:stopped");
         return self;
@@ -383,10 +383,8 @@ Plugin.extend({
     _isContainer: false,
     _render: true,
     initPlugin: function(data) {
-        console.log('data', data);
         var self = this;
         var dims = this.relativeDims();
-        console.log("dims -> ", dims);
 
         self.game = new WordWormPlugin.Game(data.wordText).start();
         self.gameRenderer = new WordWormPlugin.GameRenderer(dims);
@@ -397,25 +395,12 @@ Plugin.extend({
         }
 
         createjs.Ticker.setInterval(10);
-        createjs.Ticker.setFPS(1);
+        createjs.Ticker.setFPS(2);
         createjs.Ticker.addEventListener("tick", tickEventListener);
-
-        // TelemetryService.isActive = true;
-        // var assessEvent = TelemetryService.assess("org.ekstep.wordworm.01", "LIT", "EASY", { stageId: self._stage._currentState.stage.id, subtype: " " });
 
         self.game.addEventListener("game:stopped", function() {
             console.log("Removing tickEventListener");
             createjs.Ticker.removeEventListener("tick", tickEventListener);
-
-            // var assessEndEventData = {
-            //     pass: self.game.isWon,
-            //     score: self.game.isWon ? 1 : 0,
-            //     res: self.game.stopReason,
-            //     qindex: 1,
-            //     qtitle: "WordWorm game for word : " + self.game.word,
-            //     qdesc: ""
-            // };
-            // TelemetryService.assessEnd(assessEvent, assessEndEventData);
         });
 
         this._self = this.gameRenderer.getMainRenderingObject();

@@ -14,6 +14,15 @@ WordWormPlugin.Direction = Class.extend({
 
     isOppositeOf: function(otherDirection) {
         return (this.offsetX && this.offsetX === (otherDirection.offsetX * -1)) || (this.offsetY && this.offsetY === (otherDirection.offsetY * -1));
+    },
+
+    getOppositeDirection: function() {
+        var self = this;
+        var allDirections = Object.values(WordWormPlugin.Direction)
+        var oppositeDirection = _.find(allDirections, function(direction) {
+            return self.isOppositeOf(direction);
+        });
+        return oppositeDirection || WordWormPlugin.Direction.NONE;
     }
 });
 Object.defineProperties(WordWormPlugin.Direction, {
@@ -41,7 +50,7 @@ WordWormPlugin.Game = function(word) {
     createjs.EventDispatcher.initialize(self);
     self.word = word || "";
     self.grid = new WordWormPlugin.Grid(18, 26); // Ratio 9:13
-    self.worm = new WordWormPlugin.Worm(new WordWormPlugin.Position(3, 0), WordWormPlugin.Direction.RIGHT);
+    self.worm = new WordWormPlugin.Worm(new WordWormPlugin.Position(0, 0), WordWormPlugin.Direction.RIGHT);
     self.isInProgress = false;
 
     self.start = function() {
@@ -79,7 +88,15 @@ WordWormPlugin.Game = function(word) {
         if(self.grid.isOutside(nextPositionOfWorm)) {
             console.log("Worm is going outside the grid ", self.grid, nextPositionOfWorm);
             self.stop();
+        } else if(self.worm.hasNodeAtPosition(nextPositionOfWorm)) {
+            console.log("Worm is collides with the body at position ", nextPositionOfWorm);
+            self.stop();
         } else {
+            var foodItemAtWormPosition = self.grid.getFooodItemAtPosoition(self.worm.getCurrentPosition());
+            if(foodItemAtWormPosition) {
+                self.worm.feedFoodItem(foodItemAtWormPosition);
+                self.grid.removeFoodItem(foodItemAtWormPosition);
+            }
             self.worm.move();
         }
     }
@@ -105,9 +122,22 @@ WordWormPlugin.Grid = Class.extend({
         return position.x < 0 || position.y < 0 || position.x > this.numberOfCulumns - 1  || position.y > this.numberOfRows - 1;
     },
 
+    getFooodItemAtPosoition: function(position) {
+        return _.find(this.foodItems, function(foodItem) {
+            return foodItem.position.equals(position);
+        });
+    },
+
+    removeFoodItem: function(foodItem) {
+        var index = this.foodItems.indexOf(foodItem);
+        if(index > -1) {
+            this.foodItems.splice(index, 1);
+        }
+    },
+
     _randomPositionForFoodItem: function() {
-        var minX = 1;
-        var minY = 1;
+        var minX = 2; // Avoids worm eating foodItem at beginning
+        var minY = 2; // Avoids worm eating foodItem at beginning
         var randomX = _.random(minX, this.numberOfCulumns - 1);
         var randomY = _.random(minY, this.numberOfRows - 1);
         var randomPosition = new WordWormPlugin.Position(randomX, randomY);
@@ -184,6 +214,19 @@ WordWormPlugin.Worm = Class.extend({
         this.direction = direction;
     },
 
+    hasNodeAtPosition: function(position) {
+        return _.any(this.nodes, function(node) {
+            return node.position.equals(position);
+        });
+    },
+
+    feedFoodItem: function(foodItem) {
+        var lastNode = _.last(this.nodes);
+        var positionOfNewNode = lastNode.direction.getOppositeDirection().applyOffset(lastNode.position);
+        var newNode = new WordWormPlugin.WormNode(false, lastNode.direction, positionOfNewNode, foodItem.alphabet);
+        this.nodes.push(newNode);
+    },
+
     move: function() {
         var directionForNextNode = this.direction;
         _.each(this.nodes, function(node) {
@@ -195,13 +238,8 @@ WordWormPlugin.Worm = Class.extend({
     },
 
     _defaultNodes: function(position, direction) {
-        // var headNode = new WordWormPlugin.WormNode(true, this.direction, position || new WordWormPlugin.Position(0, 0));
-        // return [headNode];
-        var headNode = new WordWormPlugin.WormNode(true, this.direction, position || new WordWormPlugin.Position(3, 0));
-        var n1 = new WordWormPlugin.WormNode(true, this.direction, new WordWormPlugin.Position(2, 0), "D");
-        var n2 = new WordWormPlugin.WormNode(true, this.direction, new WordWormPlugin.Position(1, 0), "O");
-        var n3 = new WordWormPlugin.WormNode(true, this.direction, new WordWormPlugin.Position(0, 0), "G");
-        return [headNode, n1, n2, n3];
+        var headNode = new WordWormPlugin.WormNode(true, this.direction, position || new WordWormPlugin.Position(0, 0));
+        return [headNode];
     }
 });
 
@@ -254,9 +292,17 @@ WordWormPlugin.GridRenderer = Class.extend({
         var self = this;
         _.each(grid.foodItems, function(foodItem) {
             self.foodItemToRenderedObjectMap[foodItem.id] = self.foodItemToRenderedObjectMap[foodItem.id] || self._createRenderingObjectForFoodItem(foodItem, cellDims);
-            var renderedObject = self.foodItemToRenderedObjectMap[foodItem.id];
-            renderedObject.x = foodItem.position.x * cellDims.w;
-            renderedObject.y = foodItem.position.y * cellDims.h;
+        });
+
+        _.each(Object.entries(self.foodItemToRenderedObjectMap), function(entry) {
+            var foodItemId = entry[0];
+            var foodItemRenderedObject = entry[1];
+            var foodItemIsDeleted = !_.any(grid.foodItems, function(foodItem) {
+                return foodItem.id === foodItemId;
+            });
+            if(foodItemIsDeleted) {
+                self.parentContainer.removeChild(foodItemRenderedObject);
+            }
         });
     },
 
@@ -275,6 +321,8 @@ WordWormPlugin.GridRenderer = Class.extend({
 
         var foodItemContainer = new createjs.Container();
         foodItemContainer.addChild(reactangle, text);
+        foodItemContainer.x = foodItem.position.x * cellDims.w;
+        foodItemContainer.y = foodItem.position.y * cellDims.h;
 
         this.parentContainer.addChild(foodItemContainer);
 

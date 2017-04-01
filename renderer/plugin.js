@@ -48,23 +48,21 @@ WordWormPlugin.Position = Class.extend({
 WordWormPlugin.Game = function(word) {
     var self = this;
     createjs.EventDispatcher.initialize(self);
-    self.word = word || "";
+    self.word = (word || "").toUpperCase();
     self.grid = new WordWormPlugin.Grid(18, 26); // Ratio 9:13
     self.worm = new WordWormPlugin.Worm(new WordWormPlugin.Position(0, 0), WordWormPlugin.Direction.RIGHT);
-    self.isInProgress = false;
 
     self.start = function() {
         console.log("Starting the WordWorm game for word :", self.word);
-        self.isInProgress = true;
         document.addEventListener('keydown', self._onKeyDownHandler, false);
         self.grid.placeFoodItemsForAplhabets(this.word.split(""));
         return self;
     };
 
-    self.stop = function() {
-        console.log("Stopping the WordWorm game for word :", self.word);
-        self.isInProgress = false;
+    self.stop = function(reason) {
+        console.log("Stopping the WordWorm game for word :", self.word, reason);
         document.removeEventListener('keydown', self._onKeyDownHandler, false);
+        self.dispatchEvent("game:stopped");
         return self;
     };
 
@@ -81,22 +79,24 @@ WordWormPlugin.Game = function(word) {
     };
 
     self.onEachTick = function() {
-        if(!self.isInProgress) {
-            return;
+        var foodItemAtWormPosition = self.grid.getFooodItemAtPosoition(self.worm.getCurrentPosition());
+        if (foodItemAtWormPosition) {
+            self.worm.feedFoodItem(foodItemAtWormPosition);
+            self.grid.removeFoodItem(foodItemAtWormPosition);
         }
+
+        var wordForemedByWorm = self.worm.getWord();
         var nextPositionOfWorm = self.worm.getNextPosition();
-        if(self.grid.isOutside(nextPositionOfWorm)) {
-            console.log("Worm is going outside the grid ", self.grid, nextPositionOfWorm);
-            self.stop();
-        } else if(self.worm.hasNodeAtPosition(nextPositionOfWorm)) {
-            console.log("Worm is collides with the body at position ", nextPositionOfWorm);
-            self.stop();
+
+        if (wordForemedByWorm === self.word) {
+            self.stop("Worm has formed the word successfully");
+        } else if (wordForemedByWorm && self.word.indexOf(wordForemedByWorm) !== 0) {
+            self.stop("Worm has alphabet is wrong order");
+        } else if (self.grid.isOutside(nextPositionOfWorm)) {
+            self.stop("Worm is going outside the grid");
+        } else if (self.worm.hasNodeAtPosition(nextPositionOfWorm)) {
+            self.stop("Worm is collides with the body");
         } else {
-            var foodItemAtWormPosition = self.grid.getFooodItemAtPosoition(self.worm.getCurrentPosition());
-            if(foodItemAtWormPosition) {
-                self.worm.feedFoodItem(foodItemAtWormPosition);
-                self.grid.removeFoodItem(foodItemAtWormPosition);
-            }
             self.worm.move();
         }
     }
@@ -119,7 +119,7 @@ WordWormPlugin.Grid = Class.extend({
     },
 
     isOutside: function(position) {
-        return position.x < 0 || position.y < 0 || position.x > this.numberOfCulumns - 1  || position.y > this.numberOfRows - 1;
+        return position.x < 0 || position.y < 0 || position.x > this.numberOfCulumns - 1 || position.y > this.numberOfRows - 1;
     },
 
     getFooodItemAtPosoition: function(position) {
@@ -130,7 +130,7 @@ WordWormPlugin.Grid = Class.extend({
 
     removeFoodItem: function(foodItem) {
         var index = this.foodItems.indexOf(foodItem);
-        if(index > -1) {
+        if (index > -1) {
             this.foodItems.splice(index, 1);
         }
     },
@@ -191,7 +191,15 @@ WordWormPlugin.Worm = Class.extend({
     },
 
     getDataNodes: function() {
-        return this.nodes[0].slice(1);
+        return this.nodes.slice(1);
+    },
+
+    getWord: function() {
+        var alphabets =_.map(this.getDataNodes(), function(node) {
+            return node.data;
+        });
+        var word = alphabets.join('');
+        return word;
     },
 
     getNextPosition: function() {
@@ -300,7 +308,7 @@ WordWormPlugin.GridRenderer = Class.extend({
             var foodItemIsDeleted = !_.any(grid.foodItems, function(foodItem) {
                 return foodItem.id === foodItemId;
             });
-            if(foodItemIsDeleted) {
+            if (foodItemIsDeleted) {
                 self.parentContainer.removeChild(foodItemRenderedObject);
             }
         });
@@ -339,7 +347,8 @@ WordWormPlugin.GameRenderer = Class.extend({
     },
 
     render: function(game) {
-        var cellDims = { w: this.dims.w / game.grid.numberOfCulumns, h: this.dims.h / game.grid.numberOfRows };
+        var pixelsOccupiedByBorder = 2;
+        var cellDims = { w: (this.dims.w - pixelsOccupiedByBorder) / game.grid.numberOfCulumns, h: (this.dims.h - pixelsOccupiedByBorder) / game.grid.numberOfRows };
         this.gridRenderer.render(game.grid, cellDims);
         this.wormRenderer.render(game.worm, cellDims);
         Renderer.update = true;
@@ -378,11 +387,18 @@ Plugin.extend({
         this.game = new WordWormPlugin.Game(data.wordText).start();
         this.gameRenderer = new WordWormPlugin.GameRenderer(dims);
 
-        createjs.Ticker.setInterval(10);
-        createjs.Ticker.setFPS(1);
-        createjs.Ticker.addEventListener("tick", function() {
+        var tickEventListener = function() {
             self.game.onEachTick();
             self.gameRenderer.render(self.game);
+        }
+
+        createjs.Ticker.setInterval(10);
+        createjs.Ticker.setFPS(1);
+        createjs.Ticker.addEventListener("tick", tickEventListener);
+
+        self.game.addEventListener("game:stopped", function() {
+            console.log("Removing tickEventListener");
+            createjs.Ticker.removeEventListener("tick", tickEventListener);
         });
 
         this._self = this.gameRenderer.getMainRenderingObject();

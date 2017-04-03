@@ -4,9 +4,17 @@ Plugin to teach word spellings - Inspired by [snake game](https://en.wikipedia.o
 
 > Less known fact : Every book worm starts as a word worm
 
+#### Features
+
+* Detects successful word formation
+* Detects wrong order of alphabets as soon as alphabet is eaten by the worm
+* Detects wall collision
+* Detects worm collision to its own body
+
 ### Demo
 
 [![Video : Successful word formation](https://img.youtube.com/vi/IMmz9cRKv9I/0.jpg)](https://www.youtube.com/watch?v=IMmz9cRKv9I)
+
 
 ### How to run
 
